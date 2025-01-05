@@ -11,6 +11,8 @@ const fastify = require("fastify")({
   logger: false,
 });
 
+fetch('/')
+
 // ADD FAVORITES ARRAY VARIABLE FROM TODO HERE
 
 // Setup our static files
