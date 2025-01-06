@@ -4,14 +4,14 @@
  */
 
 const path = require("path");
-
+const {Olx,clients} = require("./src/clients.js");
+console.log(clients)
 // Require the fastify framework and instantiate it
 const fastify = require("fastify")({
   // Set this to true for detailed logging:
   logger: false,
 });
 
-fetch('/')
 
 // ADD FAVORITES ARRAY VARIABLE FROM TODO HERE
 
