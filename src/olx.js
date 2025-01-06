@@ -57,6 +57,9 @@ class Olx {
     }
   }
   async refreshToken() {
+    if (!this.user) {
+      this.getUser();
+    }
     const url = "https://dealer.olx.co.id/dealer-api/v1/auth/refresh_token";
     const { data } = await axios(url, {
       headers: {
