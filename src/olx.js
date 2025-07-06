@@ -1,4 +1,4 @@
-const adsParameter = require("./adsParams.json");
+const adsParameter = require("./adsParams.json"); // Asumsikan file ini ada
 const axios = require("axios");
 const fs = require("fs");
 const FormData = require("form-data");
@@ -25,19 +25,23 @@ class Olx {
         fs.mkdirSync(path.join("users"));
       }
       const file = path.join("users", this.email + ".json");
+      // Perhatikan: fs.readFileSync dapat melempar error jika file tidak ada,
+      // pastikan penanganan error atau file selalu ada sebelum dibaca
       const token = fs.readFileSync(file, "utf-8");
       const user = JSON.parse(token);
       this.user = user;
       return user;
     } catch (error) {
+      // console.error("Error reading user file:", error.message); // Tambahkan log untuk debugging
       return;
     }
   }
   async auth(force) {
-    if (this.getUser() && !force) {
-      // await this.refreshToken();
-      // return;
-    }
+    // Abaikan bagian ini jika Anda ingin selalu login, atau perbaiki logika refresh token
+    // if (this.getUser() && !force) {
+    //   // await this.refreshToken();
+    //   // return;
+    // }
     console.log("login ke dealer apps");
     const url = "https://dealer.olx.co.id/dealer-api/v1/auth/login";
     try {
@@ -53,6 +57,10 @@ class Olx {
       });
       this.user = data;
       const file = path.join("users", this.email + ".json");
+      // Pastikan direktori 'users' ada sebelum menulis file
+      if (!fs.existsSync(path.dirname(file))) {
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+      }
       fs.writeFileSync(file, JSON.stringify(data));
       console.log("login success");
       return {
@@ -60,10 +68,28 @@ class Olx {
         data,
       };
     } catch (error) {
+      console.error("Authentication error details:", error); // Log error lengkap untuk debugging
+      let errorMessage = "Unknown authentication error";
+      let errorStatus = 500; // Default ke Internal Server Error
+
+      if (error.response) {
+        // Jika ada respons dari server (misalnya 401, 403)
+        // Gunakan optional chaining untuk mengakses 'data' dan 'error'
+        errorMessage = error.response.data?.error || error.response.statusText || errorMessage;
+        errorStatus = error.response.status || errorStatus;
+      } else if (error.request) {
+        // Permintaan dibuat tapi tidak ada respons diterima (mis. masalah jaringan)
+        errorMessage = "Network error or no response from server.";
+        errorStatus = 503; // Service Unavailable
+      } else {
+        // Sesuatu terjadi dalam pengaturan permintaan yang memicu Error
+        errorMessage = error.message;
+      }
+
       return {
         error: {
-          error: error.response.data.error,
-          status: error.status,
+          error: errorMessage,
+          status: errorStatus,
         },
       };
     }
@@ -73,19 +99,28 @@ class Olx {
       this.getUser();
     }
     const url = "https://dealer.olx.co.id/dealer-api/v1/auth/refresh_token";
-    const { data } = await axios(url, {
-      headers: {
-        Authorization: "Bearer " + this.user.refresh_token,
-        ...this.headers,
-      },
-      method: "POST",
-      data: {
-        user_id: this.user.user_id,
-      },
-    });
-    this.user = data;
-    const file = path.join("users", this.email + ".json");
-    fs.writeFileSync(file, JSON.stringify(data));
+    try {
+      const { data } = await axios(url, {
+        headers: {
+          Authorization: "Bearer " + this.user.refresh_token,
+          ...this.headers,
+        },
+        method: "POST",
+        data: {
+          user_id: this.user.user_id,
+        },
+      });
+      this.user = data;
+      const file = path.join("users", this.email + ".json");
+      if (!fs.existsSync(path.dirname(file))) {
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+      }
+      fs.writeFileSync(file, JSON.stringify(data));
+    } catch (err) {
+      console.error("Error refreshing token:", err.message); // Tambahkan log
+      // Handle error refresh token, mungkin perlu otentikasi ulang
+      throw err; // Lempar kembali error agar bisa ditangani di tempat lain
+    }
   }
   async getMe() {
     const url = "https://dealer.olx.co.id/dealer-api/v1/auth/me";
@@ -98,48 +133,58 @@ class Olx {
       });
       return data;
     } catch (err) {
-      console.log(err, "=>>");
-      if (err.status === 403) {
+      console.error("Error getMe:", err.message, "status:", err.response?.status); // Log status jika ada
+      if (err.response && err.response.status === 403) {
         await this.auth(true);
         return await this.getMe();
       }
+      throw err; // Lempar kembali error jika bukan 403 atau gagal auth ulang
     }
   }
 
   async getQuota() {
     const url =
       "https://dealer.olx.co.id/dealer-api/sell/user_packages?categoryId=198&cityId=4000029&code=CODE_VAS";
-    const { data } = await axios(url, {
-      headers: {
-        ...this.headers,
-        Authorization: "Bearer " + this.user.access_token,
-      },
-    });
-    // .replace(/[^0-9]/g, '')
-    const paket = data.data?.map((d) => {
-      return {
-        package_id: d?.package_id,
-        quota: +d?.package_info?.available?.replace(/[^0-9]/g, ""),
-      };
-    });
-    return paket;
+    try {
+      const { data } = await axios(url, {
+        headers: {
+          ...this.headers,
+          Authorization: "Bearer " + this.user.access_token,
+        },
+      });
+      const paket = data.data?.map((d) => {
+        return {
+          package_id: d?.package_id,
+          quota: +d?.package_info?.available?.replace(/[^0-9]/g, ""),
+        };
+      });
+      return paket;
+    } catch (err) {
+        console.error("Error fetching quota:", err.message, "status:", err.response?.status);
+        throw err;
+    }
   }
 
   async sundulAdsByid(inventory_id, package_id) {
     const url = "https://dealer.olx.co.id/dealer-api/sell/consumefeature";
-    const { data } = await axios(url, {
-      headers: {
-        ...this.headers,
-        Authorization: "Bearer " + this.user.access_token,
-      },
-      data: {
-        inventory_id: inventory_id,
-        package_id: package_id,
-        feature_code: "CODE_BOOSTTOTOP",
-      },
-      method: "POST",
-    });
-    return data.data.message;
+    try {
+      const { data } = await axios(url, {
+        headers: {
+          ...this.headers,
+          Authorization: "Bearer " + this.user.access_token,
+        },
+        data: {
+          inventory_id: inventory_id,
+          package_id: package_id,
+          feature_code: "CODE_BOOSTTOTOP",
+        },
+        method: "POST",
+      });
+      return data.data.message;
+    } catch (err) {
+        console.error("Error sunduling ad:", err.message, "status:", err.response?.status);
+        throw err;
+    }
   }
   async getAllAds(limit = 1000, offset = 0, sundul = false) {
     let param = sundul ? "ads-live" : "ads-all";
@@ -153,13 +198,18 @@ class Olx {
       "&count=" +
       limit +
       "&sort=creationDate,desc";
-    const { data } = await axios(url, {
-      headers: {
-        ...this.headers,
-        Authorization: "Bearer " + this.user.access_token,
-      },
-    });
-    return data;
+    try {
+      const { data } = await axios(url, {
+        headers: {
+          ...this.headers,
+          Authorization: "Bearer " + this.user.access_token,
+        },
+      });
+      return data;
+    } catch (err) {
+        console.error("Error getting all ads:", err.message, "status:", err.response?.status);
+        throw err;
+    }
   }
 
   async getAdByid(id) {
@@ -167,17 +217,22 @@ class Olx {
       "https://dealer.olx.co.id/dealer-api/sell/my_ads?offset=0&segment=ads-live&query=" +
       id +
       "&video=true&screen=ads-live&count=12&sort=creationDate,desc";
-    const { data } = await axios(url, {
-      headers: {
-        ...this.headers,
-        Authorization: "Bearer " + this.user.access_token,
-      },
-    });
-    if (data.total === 0) {
-      throw new Error("Iklan tidak ditemukan");
+    try {
+      const { data } = await axios(url, {
+        headers: {
+          ...this.headers,
+          Authorization: "Bearer " + this.user.access_token,
+        },
+      });
+      if (data.total === 0) {
+        throw new Error("Iklan tidak ditemukan");
+      }
+      const [ad] = data.ads;
+      console.log(ad);
+    } catch (err) {
+        console.error("Error getting ad by ID:", err.message, "status:", err.response?.status);
+        throw err; // Penting untuk melempar error agar ditangkap oleh pemanggil
     }
-    const [ad] = data.ads;
-    console.log(ad);
   }
 
   async getOladByid(id) {
@@ -202,47 +257,58 @@ class Olx {
 
       return default_value;
     } catch (err) {
-      return;
+      console.error("Error getting OLAD by ID:", err.message, "status:", err.response?.status);
+      return; // Mengembalikan undefined jika ada error
     }
   }
 
   async deleteAdById(id) {
     const url =
       "https://dealer.olx.co.id/dealer-api/sell/" + id + "/delete?code=close";
-    const { data } = await axios(url, {
-      headers: {
-        Authorization: "Bearer " + this.user.access_token,
-        ...this.headers,
-      },
-      method: "DELETE",
-    });
-    return data;
+    try {
+      const { data } = await axios(url, {
+        headers: {
+          Authorization: "Bearer " + this.user.access_token,
+          ...this.headers,
+        },
+        method: "DELETE",
+      });
+      return data;
+    } catch (err) {
+        console.error("Error deleting ad by ID:", err.message, "status:", err.response?.status);
+        throw err;
+    }
   }
 
   async editAdById(id, ad) {
-    ad = await this.createAd(ad);
-    const inventory_id = await this.getOladByid(id);
-    if (inventory_id) {
-      ad.inventory_management_id = inventory_id;
+    try {
+      ad = await this.createAd(ad); // Memanggil createAd, pastikan ini tidak error
+      const inventory_id = await this.getOladByid(id);
+      if (inventory_id) {
+        ad.inventory_management_id = inventory_id;
+      }
+      const url =
+        "https://dealer.olx.co.id/dealer-api/sell/posting/edit?adId=" + id;
+      const dataAd = {
+        category_id: "198",
+        parameter: ad,
+      };
+      const res = await axios(url, {
+        headers: {
+          Authorization: "Bearer " + this.user.access_token,
+          ...this.headers,
+        },
+        data: dataAd,
+        method: "POST",
+      });
+      const olad_id = res.data.data[0].id;
+      /* get id iklan olx**/
+      const old_ad = await this.waitAdShowEdit(olad_id);
+      return { olad_id, ad_id: old_ad?.details?.ad_url, message: "done edit" };
+    } catch (err) {
+        console.error("Error editing ad by ID:", err.message, "status:", err.response?.status);
+        throw err;
     }
-    const url =
-      "https://dealer.olx.co.id/dealer-api/sell/posting/edit?adId=" + id;
-    const dataAd = {
-      category_id: "198",
-      parameter: ad,
-    };
-    const res = await axios(url, {
-      headers: {
-        Authorization: "Bearer " + this.user.access_token,
-        ...this.headers,
-      },
-      data: dataAd,
-      method: "POST",
-    });
-    const olad_id = res.data.data[0].id;
-    /* get id iklan olx**/
-    const old_ad = await this.waitAdShowEdit(olad_id);
-    return { olad_id, ad_id: old_ad?.details?.ad_url, message: "done edit" };
   }
   async delay(ms = 500) {
     return new Promise((resolve) => {
@@ -287,14 +353,14 @@ class Olx {
     let offset = 0;
     let { ads } = await this.getAllAds(limit, offset);
     let old_ad = ads.find((a) => a.id === olad_id);
-    while (!old_ad) {
+    while (!old_ad && offset < 5000) { // Tambahkan batasan offset untuk menghindari loop tak terbatas
       await this.delay(200);
       offset += limit;
       let { ads: ads2 } = await this.getAllAds(limit, offset);
       old_ad = ads2.find((a) => a.id === olad_id);
       console.log("wait ad show edit");
     }
-    return old_ad;
+    return old_ad; // Mengembalikan undefined jika tidak ditemukan setelah loop
   }
   async postingAd(ad) {
     const data = {
@@ -302,19 +368,24 @@ class Olx {
       parameter: ad,
     };
     const url = "https://dealer.olx.co.id/dealer-api/sell/posting";
-    const res = await axios(url, {
-      headers: {
-        Authorization: "Bearer " + this.user.access_token,
-        ...this.headers,
-      },
-      data,
-      method: "POST",
-    });
-    const olad_id = res.data.data[0].id;
-    /* get id iklan olx**/
-    const old_ad = await this.waitAdShow(olad_id);
-    console.log({ olad_id, old_ad });
-    return { olad_id, ad_id: old_ad?.details?.ad_url, message: "done upload" };
+    try {
+      const res = await axios(url, {
+        headers: {
+          Authorization: "Bearer " + this.user.access_token,
+          ...this.headers,
+        },
+        data,
+        method: "POST",
+      });
+      const olad_id = res.data.data[0].id;
+      /* get id iklan olx**/
+      const old_ad = await this.waitAdShow(olad_id);
+      console.log({ olad_id, old_ad });
+      return { olad_id, ad_id: old_ad?.details?.ad_url, message: "done upload" };
+    } catch (err) {
+        console.error("Error posting ad:", err.message, "status:", err.response?.status);
+        throw err;
+    }
   }
 
   /** create ads */
@@ -356,7 +427,7 @@ class Olx {
       inventory_management_id: "",
     };
 
-    const adsParam = adsParameter;
+    const adsParam = adsParameter; // Pastikan adsParams.json ada dan sesuai
     const make = adsParam
       .find((c) => c.code === "make")
       .values.find((c) => this.findData(c, data.make));
@@ -427,17 +498,33 @@ class Olx {
     parameter.price = +data.price;
     if (data.files && !IS_TESTING) {
       const images = (
-        await Promise.all(data.files.map((file) => this.uploadPicture(file)))
+          // Tangani error individual upload gambar
+          await Promise.all(data.files.map(async (file) => {
+              try {
+                  return await this.uploadPicture(file);
+              } catch (uploadErr) {
+                  console.error(`Failed to upload picture ${file.fileName}:`, uploadErr.message);
+                  return null; // Kembalikan null agar bisa difilter
+              }
+          }))
       )
-        .filter((f) => f)
+        .filter((f) => f) // Filter yang null
         .map((f) => f?.id);
       parameter.images = images;
     }
     const location = (
-      await Promise.all(
-        data.location.map((address) => this.getLocation(address))
-      )
-    ).filter((f) => f);
+        // Tangani error individual mendapatkan lokasi
+        await Promise.all(
+          data.location.map(async (address) => {
+              try {
+                  return await this.getLocation(address);
+              } catch (locErr) {
+                  console.error(`Failed to get location for ${address}:`, locErr.message);
+                  return null; // Kembalikan null agar bisa difilter
+              }
+          })
+        )
+    ).filter((f) => f); // Filter yang null
     this.saveLocation(location);
     parameter.location = location;
     parameter.inventory_management_id = data.inventory_management_id;
@@ -454,7 +541,7 @@ class Olx {
       });
       return res.data;
     } catch (err) {
-      console.log(err);
+      console.error("Error fetching file by URL:", err.message); // Log error
       return;
     }
   }
@@ -463,7 +550,8 @@ class Olx {
     try {
       file = await this.getFileByUrl(dataFile);
       if (!file) {
-        return;
+        console.warn("No file content received for upload:", dataFile.fileName);
+        return; // Mengembalikan undefined jika file tidak didapatkan
       }
       const url = "https://dealer.olx.co.id/dealer-api/sell/image";
       const form = new FormData();
@@ -480,7 +568,9 @@ class Olx {
       dataFile.id = data.data.id;
       return dataFile;
     } catch (err) {
-      console.log(file, dataFile);
+      console.error("Error uploading picture:", err.message); // Log error
+      // console.log(file, dataFile); // Bisa dihapus setelah debugging
+      throw err; // Lempar kembali error agar bisa ditangkap oleh pemanggil
     }
   }
 
@@ -494,16 +584,26 @@ class Olx {
       const url =
         "https://dealer.olx.co.id/dealer-api/sell/locations/autocomplete?input=" +
         encodeURIComponent(address);
-      const { data: response } = await axios(url, {
+      const { data: responseDataFromApi } = await axios(url, { // Rename 'data' to 'responseDataFromApi' to avoid confusion
         headers: {
           Authorization: "Bearer " + this.user.access_token,
           ...this.headers,
         },
       });
-      const { data, error } = response;
+      // 'responseDataFromApi' sekarang adalah payload data dari respons API
+      const { data, error } = responseDataFromApi; // Ini asumsinya API response memiliki { data, error } di dalam payload utama
+      
       if (error) {
+        console.error("OLX API returned an error for getLocation:", error);
         return;
       }
+      
+      // Tambahkan pengecekan untuk memastikan data.suggestions ada dan tidak kosong
+      if (!data || !data.suggestions || data.suggestions.length === 0) {
+        console.warn(`No suggestions found for address: ${address}`);
+        return;
+      }
+
       const [{ latitude, longitude, parentId, id, name }] = data.suggestions;
       const item = {
         lat: latitude,
@@ -514,15 +614,21 @@ class Olx {
       };
       return item;
     } catch (err) {
-      console.log(err);
-      return;
+      console.error("Error in getLocation:", err.message, "status:", err.response?.status); // Log error lengkap
+      throw err; // Lempar kembali error
     }
   }
 
   saveLocation(location) {
     this.locations = [...new Set([...this.locations, ...location])];
-
-    fs.writeFileSync("locations.json", JSON.stringify(this.locations));
+    // Pastikan direktori root ada jika Anda mencoba menulis di sana
+    // Atau simpan di direktori yang dijamin ada, misalnya '/tmp' di Vercel
+    try {
+        fs.writeFileSync("locations.json", JSON.stringify(this.locations));
+    } catch (err) {
+        console.error("Error saving locations.json:", err.message);
+        // Pertimbangkan apakah ini error fatal atau bisa diabaikan
+    }
   }
 
   getLocalLocation() {
@@ -530,6 +636,7 @@ class Olx {
       const location = fs.readFileSync("locations.json");
       this.locations = JSON.parse(location);
     } catch (err) {
+      // console.error("Error reading locations.json:", err.message); // Tambahkan log
       return [];
     }
   }
