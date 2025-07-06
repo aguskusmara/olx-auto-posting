@@ -29,19 +29,22 @@ const fastify = require("fastify")({
 // ADD FAVORITES ARRAY VARIABLE FROM TODO HERE
 
 // Setup our static files (jika Anda menggunakan file statis seperti CSS/JS)
-// fastify.register(require("@fastify/static"), {
-//   root: path.join(__dirname, "public"),
-//   prefix: "/", // optional: default '/'
-// });
+fastify.register(require("@fastify/static"), {
+  root: path.join(__dirname, "public"),
+  prefix: "/", // optional: default '/'
+});
 
 // Formbody lets us parse incoming forms
 fastify.register(require("@fastify/formbody"));
 
-// View is a templating manager for fastify
-fastify.register(require("@fastify/view"), {
+// Konfigurasi @fastify/view untuk Handlebars
+fastify.register(require('@fastify/view'), {
   engine: {
-    handlebars: require("handlebars"),
+    handlebars: require('handlebars')
   },
+  // Pastikan 'root' mengarah ke direktori tempat template .hbs Anda berada
+  // Misalnya, jika index.hbs ada di your-project-root/src/pages/
+  root: path.join(__dirname, 'src', 'pages') // Ini akan menunjuk ke /var/task/src/pages/
 });
 
 // Load and parse SEO data
