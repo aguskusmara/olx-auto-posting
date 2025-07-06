@@ -311,7 +311,6 @@ fastify.post("/sundul", async function (request, reply) {
       success: false,
       message: err.message,
     };
-    
     await postToGs(dt);
     reply.send({
       success: false,
