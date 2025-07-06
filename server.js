@@ -4,7 +4,7 @@
  */
 const axios = require("axios");
 
-const path = require("path");
+const path = require("path"); // <-- Pastikan ini ada
 const {
   Olx,
   clients,
@@ -41,6 +41,11 @@ fastify.register(require("@fastify/view"), {
   engine: {
     handlebars: require("handlebars"),
   },
+  // --- PERBAIKAN PENTING DI SINI ---
+  // Tentukan direktori 'root' untuk template Anda
+  // path.join(__dirname, 'src', 'pages') akan menghasilkan
+  // '/var/task/src/pages' di lingkungan Vercel
+  root: path.join(__dirname, 'src', 'pages'),
 });
 
 // Load and parse SEO data
@@ -73,8 +78,9 @@ fastify.get("/", function (request, reply) {
     };
   }
 
-  // The Handlebars code will be able to access the parameter values and build them into the page
-  return reply.view("/src/pages/index.hbs", params);
+  // --- PERBAIKAN PENTING DI SINI ---
+  // Hanya berikan nama file template relatif terhadap 'root' yang sudah dikonfigurasi
+  return reply.view("index.hbs", params);
 });
 
 /**
@@ -115,8 +121,9 @@ fastify.post("/", function (request, reply) {
     }
   }
 
-  // The Handlebars template will use the parameter values to update the page with the chosen color
-  return reply.view("/src/pages/index.hbs", params);
+  // --- PERBAIKAN PENTING DI SINI ---
+  // Hanya berikan nama file template relatif terhadap 'root' yang sudah dikonfigurasi
+  return reply.view("index.hbs", params);
 });
 
 fastify.post("/login", async function (request, reply) {
@@ -320,7 +327,9 @@ fastify.post("/sundul", async function (request, reply) {
 });
 
 // Run the server and report out to the logs
-fastify.listen({ port: 8888, host: "0.0.0.0" }, function (err, address) {
+// PERHATIKAN: Untuk Vercel, server harus mendengarkan di process.env.PORT
+// Jika tidak disetel, gunakan nilai default yang masuk akal (mis. 3000)
+fastify.listen({ port: process.env.PORT || 3000, host: "0.0.0.0" }, function (err, address) {
   if (err) {
     console.error(err);
     process.exit(1);
