@@ -152,38 +152,81 @@ async function postToGs(data) {
   }
 }
 
+// Deklarasi Route untuk /posting
 fastify.post("/posting", async function (request, reply) {
-  const { user, ad, IS_TESTING, requestId, server, access_token, func } =
-    request.body;
+  const { user, data: ad, IS_TESTING, server, access_token, func, requestId } = request.body;
+
   const dt = {
     requestId,
     server,
     access_token,
     func,
+    car_id: ad.car_id, // Asumsikan car_id ada di data ad
   };
+
   try {
     const id = await postingAds({ user, data: ad, IS_TESTING });
+    
+    // Data untuk dikirim ke Google Sheets jika sukses
     dt.data = {
       success: true,
       ...id,
     };
     await postToGs(dt);
-    return reply.send({
-      success: true,
-      ...id,
-    });
-  } catch (err) {
-    let m = err.response?.data?.fieldErrors
-      ?.map((e) => e?.field + "\n" + e?.message)
-      ?.join("\n");
-    dt.data = {
-      success: false,
-      message: err.response?.data ? m : err.message,
-    };
-    await postToGs(dt);
+
+    // Respon ke client
     reply.send({
+      success: true,
+      message: "Ad posted successfully.",
+      ...id,
+      car_id: ad.car_id, // Sertakan car_id di respons client
+    });
+
+  } catch (err) {
+    fastify.log.error("Error in /posting route:", err); // Log seluruh objek error untuk debugging
+
+    let clientErrorMessage = "An unexpected error occurred."; // Pesan default untuk client
+    let gsErrorMessage = "An unexpected error occurred."; // Pesan default untuk Google Sheets
+
+    if (err.response) {
+      // Error dari respons API eksternal (mis. OLX)
+      const apiErrorData = err.response.data;
+      if (apiErrorData && apiErrorData.fieldErrors && apiErrorData.fieldErrors.length > 0) {
+        clientErrorMessage = apiErrorData.fieldErrors
+          .map((e) => e.field + ": " + e.message)
+          .join("\n");
+      } else if (apiErrorData && apiErrorData.message) {
+        // Jika ada properti 'message' di data respons API OLX
+        clientErrorMessage = apiErrorData.message;
+      } else if (err.response.statusText) {
+        // Fallback ke status text HTTP jika tidak ada pesan spesifik
+        clientErrorMessage = err.response.statusText;
+      }
+      gsErrorMessage = `API Error (${err.response.status || 'Unknown'}): ${clientErrorMessage}`;
+
+    } else if (err.request) {
+      // Permintaan dibuat tapi tidak ada respons (mis. masalah jaringan)
+      clientErrorMessage = "Network error or no response from external API. Please try again later.";
+      gsErrorMessage = clientErrorMessage;
+    } else {
+      // Error lain (mis. dari validasi kode lokal di olx.js/client.js)
+      // Contoh: "make tidak ditemukan", "Iklan tidak ditemukan"
+      clientErrorMessage = err.message || "An error occurred during ad processing.";
+      gsErrorMessage = clientErrorMessage;
+    }
+
+    // Data untuk dikirim ke Google Sheets jika gagal
+    dt.data = {
       success: false,
-      message: err.response?.data ? m : err.message,
+      message: gsErrorMessage, // Menggunakan pesan yang lebih detail untuk GS
+    };
+    await postToGs(dt);
+
+    // Respon ke client
+    reply.status(500).send({ // Menggunakan status 500 untuk error internal server
+      success: false,
+      message: clientErrorMessage, // Menggunakan pesan yang lebih user-friendly untuk client
+      car_id: ad.car_id,
     });
   }
 });
