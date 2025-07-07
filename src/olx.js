@@ -538,9 +538,9 @@ class Olx {
       const v = data.m_tipe_variant?.toString().toLowerCase();
       const bahanBakar = ["bensin", "diesel", "hybrid", "listrik"].find(
         (b) =>
-          (v === "solar" && b === "diesel") || (v && v.includes(b)) || (b === "bensin" && !v)
-      ); // solar = diesel, bensin sebagai default fallback
-      console.log({ bahanBakar, f: data.m_fuel, d: parameter.m_fuel })
+          (v === "solar" && b === "diesel") || v?.includes(b) || b === "bensin"
+      ); // solar = diesel
+      console.log({ bahanBakar, f: data.m_fuel, d: parameter.m_fuel, v })
       const fuel = findParamValue("m_fuel", data.m_fuel || bahanBakar);
       parameter.m_fuel = fuel.code;
 
