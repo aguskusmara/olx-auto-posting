@@ -376,19 +376,19 @@ class Olx {
       console.log("wait ad show attempt:", ++attempt);
       ok = true;
       if (!old_ad) { // Jika iklan masih belum ditemukan
-          ok = false;
+        ok = false;
       } else {
-          ad_url = old_ad.details?.ad_url;
-          ad_id = old_ad.details?.ad_table?.find((a) => a.key === "Ad Id")?.values;
-          if (!ad_url && !ad_id) {
-              ok = false;
-          } else if (!ad_url && ad_id) {
-              old_ad.details.ad_url = "https://www.olxautos.co.id/item/" + ad_id;
-          }
+        ad_url = old_ad.details?.ad_url;
+        ad_id = old_ad.details?.ad_table?.find((a) => a.key === "Ad Id")?.values;
+        if (!ad_url && !ad_id) {
+          ok = false;
+        } else if (!ad_url && ad_id) {
+          old_ad.details.ad_url = "https://www.olxautos.co.id/item/" + ad_id;
+        }
       }
     }
     if (!ok) {
-        console.warn(`Ad ${olad_id} not found after ${maxAttempts} attempts.`);
+      console.warn(`Ad ${olad_id} not found after ${maxAttempts} attempts.`);
     }
     return old_ad;
   }
@@ -477,115 +477,116 @@ class Olx {
 
     // Tambahkan fitur dari data jika ada
     if (data.feature_list && Array.isArray(data.feature_list)) {
-        parameter.video.feature_list = data.feature_list;
+      parameter.video.feature_list = data.feature_list;
     } else {
-        parameter.video.feature_list = ["Air Conditioning (AC)", "Power Steering"]; // Default jika tidak ada
+      parameter.video.feature_list = ["Air Conditioning (AC)", "Power Steering"]; // Default jika tidak ada
     }
 
     const adsParam = adsParameter; // Pastikan adsParams.json ada dan sesuai
-    
+
     // Validasi bahwa adsParam memiliki struktur yang diharapkan
     if (!Array.isArray(adsParam)) {
-        throw new Error("adsParams.json is not in expected array format.");
+      throw new Error("adsParams.json is not in expected array format.");
     }
 
     const findParamValue = (paramCode, value) => {
-        const param = adsParam.find((c) => c.code === paramCode);
-        if (!param) {
-            throw new Error(`Parameter code '${paramCode}' not found in adsParams.json.`);
-        }
-        const foundValue = param.values.find((c) => this.findData(c, value));
-        if (!foundValue) {
-            throw new Error(`${value} not found for ${paramCode}.`);
-        }
-        return foundValue;
+      const param = adsParam.find((c) => c.code === paramCode);
+      if (!param) {
+        throw new Error(`Parameter code '${paramCode}' not found in adsParams.json.`);
+      }
+      const foundValue = param.values.find((c) => this.findData(c, value));
+      if (!foundValue) {
+        throw new Error(`${value} not found for ${paramCode}.`);
+      }
+      return foundValue;
     };
 
     try {
-        const make = findParamValue("make", data.make);
-        parameter.make = make.code;
+      const make = findParamValue("make", data.make);
+      parameter.make = make.code;
 
-        const model = make.children[0].values.find((c) => this.findData(c, data.m_tipe));
-        if (!model) {
-            throw new Error(data.m_tipe + " not found for make " + data.make);
-        }
-        parameter.m_tipe = model.code;
+      const model = make.children[0].values.find((c) => this.findData(c, data.m_tipe));
+      if (!model) {
+        throw new Error(data.m_tipe + " not found for make " + data.make);
+      }
+      parameter.m_tipe = model.code;
 
-        const varian = model.children[0].values.find((c) => this.findData(c, data.m_tipe_variant));
-        if (!varian) {
-            console.log(model.children[0].values); // Log jika varian tidak ditemukan
-            throw new Error(data.m_tipe_variant + " not found for model " + data.m_tipe);
-        }
-        parameter.m_tipe_variant = varian.code;
+      const varian = model.children[0].values.find((c) => this.findData(c, data.m_tipe_variant));
+      if (!varian) {
+        console.log(model.children[0].values); // Log jika varian tidak ditemukan
+        throw new Error(data.m_tipe_variant + " not found for model " + data.m_tipe);
+      }
+      parameter.m_tipe_variant = varian.code;
 
-        const year = findParamValue("m_year", data.m_year);
-        parameter.m_year = year.code;
+      const year = findParamValue("m_year", data.m_year);
+      parameter.m_year = year.code;
 
-        const mileage = adsParam
-            .find((c) => c.code === "mileage")
-            .values.find((c) => {
-                let [start, end] = c.name.split("-");
-                start = parseFloat(start) * 1000 || 0; // Ubah 'start' ke 0 jika tidak ada
-                end = parseFloat(end) * 1000 || Infinity; // Ubah 'end' ke Infinity jika tidak ada
-                // Check if the current mileage is within the range, or if the range is open-ended (e.g., ">100000")
-                return (+data.mileage >= start && +data.mileage <= end) || c.name.includes(">");
-            });
-        if (!mileage) {
-            throw new Error(data.mileage + " not found for mileage range.");
-        }
-        parameter.mileage = mileage.code;
+      const mileage = adsParam
+        .find((c) => c.code === "mileage")
+        .values.find((c) => {
+          let [start, end] = c.name.split("-");
+          start = parseFloat(start) * 1000 || 0; // Ubah 'start' ke 0 jika tidak ada
+          end = parseFloat(end) * 1000 || Infinity; // Ubah 'end' ke Infinity jika tidak ada
+          // Check if the current mileage is within the range, or if the range is open-ended (e.g., ">100000")
+          return (+data.mileage >= start && +data.mileage <= end) || c.name.includes(">");
+        });
+      if (!mileage) {
+        throw new Error(data.mileage + " not found for mileage range.");
+      }
+      parameter.mileage = mileage.code;
 
-        const v = data.m_tipe_variant?.toString().toLowerCase();
-        const bahanBakar = ["bensin", "diesel", "hybrid", "listrik"].find(
-          (b) =>
-            (v === "solar" && b === "diesel") || (v && v.includes(b)) || (b === "bensin" && !v)
-        ); // solar = diesel, bensin sebagai default fallback
-        const fuel = findParamValue("m_fuel", data.m_fuel || bahanBakar);
-        parameter.m_fuel = fuel.code;
+      const v = data.m_tipe_variant?.toString().toLowerCase();
+      const bahanBakar = ["bensin", "diesel", "hybrid", "listrik"].find(
+        (b) =>
+          (v === "solar" && b === "diesel") || (v && v.includes(b)) || (b === "bensin" && !v)
+      ); // solar = diesel, bensin sebagai default fallback
+      const fuel = findParamValue("m_fuel", data.m_fuel || bahanBakar);
+      console.log({ bahanBakar, fuel })
+      parameter.m_fuel = fuel.code;
 
-        const color = findParamValue("m_color", data.m_color);
-        parameter.m_color = color.code;
+      const color = findParamValue("m_color", data.m_color);
+      parameter.m_color = color.code;
 
-        parameter.title = data.title;
-        parameter.description = data.description;
-        parameter.price = +data.price;
+      parameter.title = data.title;
+      parameter.description = data.description;
+      parameter.price = +data.price;
 
-        if (data.files && !IS_TESTING) {
-          const images = (
-              await Promise.all(data.files.map(async (file) => {
-                  try {
-                      return await this.uploadPicture(file);
-                  } catch (uploadErr) {
-                      console.error(`Failed to upload picture ${file.fileName}:`, uploadErr.message);
-                      return null;
-                  }
-              }))
-          )
-            .filter((f) => f) // Filter yang null
-            .map((f) => f?.id);
-          parameter.images = images;
-        }
+      if (data.files && !IS_TESTING) {
+        const images = (
+          await Promise.all(data.files.map(async (file) => {
+            try {
+              return await this.uploadPicture(file);
+            } catch (uploadErr) {
+              console.error(`Failed to upload picture ${file.fileName}:`, uploadErr.message);
+              return null;
+            }
+          }))
+        )
+          .filter((f) => f) // Filter yang null
+          .map((f) => f?.id);
+        parameter.images = images;
+      }
 
-        const location = (
-            await Promise.all(
-              data.location.map(async (address) => {
-                  try {
-                      return await this.getLocation(address);
-                  } catch (locErr) {
-                      console.error(`Failed to get location for ${address}:`, locErr.message);
-                      return null;
-                  }
-              })
-            )
-        ).filter((f) => f); // Filter yang null
-        this.saveLocation(location);
-        parameter.location = location;
-        parameter.inventory_management_id = data.inventory_management_id;
-        return parameter;
+      const location = (
+        await Promise.all(
+          data.location.map(async (address) => {
+            try {
+              return await this.getLocation(address);
+            } catch (locErr) {
+              console.error(`Failed to get location for ${address}:`, locErr.message);
+              return null;
+            }
+          })
+        )
+      ).filter((f) => f); // Filter yang null
+      this.saveLocation(location);
+      parameter.location = location;
+      parameter.inventory_management_id = data.inventory_management_id;
+      return parameter;
 
     } catch (validationError) {
-        console.error("Error creating ad parameter:", validationError.message);
-        throw validationError; // Lempar kembali error validasi agar ditangani di tingkat atas
+      console.error("Error creating ad parameter:", validationError.message);
+      throw validationError; // Lempar kembali error validasi agar ditangani di tingkat atas
     }
   }
 
