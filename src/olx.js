@@ -540,8 +540,8 @@ class Olx {
         (b) =>
           (v === "solar" && b === "diesel") || (v && v.includes(b)) || (b === "bensin" && !v)
       ); // solar = diesel, bensin sebagai default fallback
+      console.log({ bahanBakar, f: data.m_fuel, d: parameter.m_fuel })
       const fuel = findParamValue("m_fuel", data.m_fuel || bahanBakar);
-      console.log({ bahanBakar, fuel })
       parameter.m_fuel = fuel.code;
 
       const color = findParamValue("m_color", data.m_color);
