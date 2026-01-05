@@ -84,41 +84,6 @@ fastify.get("/", function (request, reply) {
 });
 
 
-fastify.get("/:user", function (request, reply) {
-  const username = request.params.user;
-  const filePath = path.join(process.cwd(), 'users.json');
-
-  try {
-    // 1. Membaca file users.json dari root directory
-    const data = fs.readFileSync(filePath, 'utf8');
-    const users = JSON.parse(data);
-    console.log({ users })
-    // 2. Mencari user berdasarkan ID
-    const userFound = users.find(u => u === username);
-
-    if (userFound) {
-      // Mengembalikan response sukses dalam format JSON
-      return reply.code(200).send({
-        status: "success",
-        data: userFound
-      });
-    } else {
-      // Mengembalikan response 404 jika user tidak ada di users.json
-      return reply.code(404).send({
-        status: "error",
-        message: `User '${username}' tidak ditemukan`
-      });
-    }
-
-  } catch (err) {
-    console.error("Gagal membaca file:", err);
-    return reply.code(500).send({
-      status: "error",
-      message: "Terjadi kesalahan pada server saat membaca data"
-    });
-  }
-});
-
 /**
  * Our POST route to handle and react to form submissions
  *
@@ -163,6 +128,16 @@ fastify.post("/", function (request, reply) {
 
 // Route untuk login client
 fastify.post("/login", async function (request, reply) {
+  const email = request.body.email;
+  const isValid = guardUser(email);
+
+  // 2. Jika guardUser mengembalikan null/false (User tidak ada di GitHub)
+  if (!isValid) {
+    return reply.status(404).send({
+      success: false,
+      message: "User tidak terdaftar atau telah dihapus dari sistem."
+    });
+  }
   const { error, success, data } = await initClient(request.body);
   if (error) {
     return reply.status(error.status || 500).send(error); // Menambahkan status code default
@@ -204,6 +179,7 @@ async function postToGs(data) {
 
 // Route untuk memposting iklan
 fastify.post("/posting", async function (request, reply) {
+
   const { user, ad, IS_TESTING, requestId, server, access_token, func } =
     request.body;
 
@@ -214,6 +190,16 @@ fastify.post("/posting", async function (request, reply) {
     func,
     car_id: ad ? ad.car_id : 'N/A', // Pastikan car_id diambil dengan aman
   };
+  const email = user.email;
+  const isValid = guardUser(email);
+
+  // 2. Jika guardUser mengembalikan null/false (User tidak ada di GitHub)
+  if (!isValid) {
+    return reply.status(404).send({
+      success: false,
+      message: "User tidak terdaftar atau telah dihapus dari sistem."
+    });
+  }
 
   try {
     const id = await postingAds({ user, data: ad, IS_TESTING });
@@ -286,6 +272,19 @@ fastify.post("/posting", async function (request, reply) {
 fastify.post("/edit", async function (request, reply) {
   const { user, ad, id, requestId, server, access_token, func, olx_id } =
     request.body;
+
+  const email = user.email;
+  const isValid = guardUser(email);
+
+  // 2. Jika guardUser mengembalikan null/false (User tidak ada di GitHub)
+  if (!isValid) {
+    return reply.status(404).send({
+      success: false,
+      message: "User tidak terdaftar atau telah dihapus dari sistem."
+    });
+  }
+
+
   const dt = {
     requestId,
     server,
@@ -348,6 +347,18 @@ fastify.post("/edit", async function (request, reply) {
 fastify.post("/delete", async function (request, reply) {
   const { user, id, requestId, server, access_token, func, olx_id } =
     request.body;
+
+  const email = user.email;
+  const isValid = guardUser(email);
+
+  // 2. Jika guardUser mengembalikan null/false (User tidak ada di GitHub)
+  if (!isValid) {
+    return reply.status(404).send({
+      success: false,
+      message: "User tidak terdaftar atau telah dihapus dari sistem."
+    });
+  }
+
   const dt = {
     requestId,
     server,
@@ -418,6 +429,18 @@ fastify.post("/delete", async function (request, reply) {
 fastify.post("/bulk-delete", async function (request, reply) {
   const { user, ids, requestId, server, access_token, func } =
     request.body; // olx_id tidak relevan di sini jika ids adalah array
+
+  const email = user.email;
+  const isValid = guardUser(email);
+
+  // 2. Jika guardUser mengembalikan null/false (User tidak ada di GitHub)
+  if (!isValid) {
+    return reply.status(404).send({
+      success: false,
+      message: "User tidak terdaftar atau telah dihapus dari sistem."
+    });
+  }
+
   const dt = {
     requestId,
     server,
@@ -479,6 +502,19 @@ fastify.post("/bulk-delete", async function (request, reply) {
 fastify.post("/sundul", async function (request, reply) {
   const { user, limit, offset, requestId, server, access_token, func } =
     request.body;
+
+
+  const email = user.email;
+  const isValid = guardUser(email);
+
+  // 2. Jika guardUser mengembalikan null/false (User tidak ada di GitHub)
+  if (!isValid) {
+    return reply.status(404).send({
+      success: false,
+      message: "User tidak terdaftar atau telah dihapus dari sistem."
+    });
+  }
+
 
   const dt = {
     requestId,
@@ -580,14 +616,77 @@ function initUsers() {
   }
 }
 
-initUsers();
 
+fastify.get("/:user", function (request, reply) {
+  const username = request.params.user;
+  const filePath = path.join(process.cwd(), 'users.json');
+
+  try {
+    // 1. Membaca file users.json dari root directory
+    const data = fs.readFileSync(filePath, 'utf8');
+    const users = JSON.parse(data);
+    // 2. Mencari user berdasarkan ID
+    const userFound = users.find(u => u === username);
+
+    if (userFound) {
+      // Mengembalikan response sukses dalam format JSON
+      return reply.code(200).send({
+        status: "success",
+        data: userFound
+      });
+    } else {
+      // Mengembalikan response 404 jika user tidak ada di users.json
+      return reply.code(404).send({
+        status: "error",
+        message: `User '${username}' tidak ditemukan`
+      });
+    }
+
+  } catch (err) {
+    console.error("Gagal membaca file:", err);
+    return reply.code(500).send({
+      status: "error",
+      message: "Terjadi kesalahan pada server saat membaca data"
+    });
+  }
+});
+
+function guardUser(username) {
+  const filePath = path.join(process.cwd(), 'users.json');
+  const userStorePath = path.join("/tmp", "users");
+
+  try {
+    const data = fs.readFileSync(filePath, 'utf8');
+    const users = JSON.parse(data);
+
+    // 1. Mencari user berdasarkan username (asumsi users.json adalah array string)
+    // Jika users.json berisi array objek, gunakan: users.find(u => u.id === username)
+    const userFound = users.find(u => u === username);
+
+    if (userFound) {
+      return userFound;
+    } else {
+      // 2. DELETE FILE temp/users/username.json jika user tidak terdaftar
+      const tempFilePath = path.join(userStorePath, `${username}.json`);
+
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+        console.log(`Security Guard: File sementara untuk ${username} telah dihapus.`);
+      }
+      return null;
+    }
+  } catch (err) {
+    console.error("Guard Error:", err);
+    return null;
+  }
+}
 
 // Jalankan server
 const start = async () => {
   try {
     // Port untuk Vercel akan otomatis diset melalui process.env.PORT
     // Untuk lokal, Anda bisa menggunakan port 3000 atau lainnya
+    initUsers();
     await fastify.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);
   } catch (err) {
