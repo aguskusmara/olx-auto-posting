@@ -27,6 +27,8 @@ const fastify = require("fastify")({
   http2SessionTimeout: 300000,
 });
 
+const users = []
+
 // ADD FAVORITES ARRAY VARIABLE FROM TODO HERE
 
 // Setup our static files (jika Anda menggunakan file statis seperti CSS/JS)
@@ -79,6 +81,42 @@ fastify.get("/", function (request, reply) {
   }
 
   return reply.view("index.hbs", params);
+});
+
+
+fastify.get("/:user", function (request, reply) {
+  const username = request.params.user; 
+  const filePath = path.join(process.cwd(), 'users.json');
+
+  try {
+    // 1. Membaca file users.json dari root directory
+    const data = fs.readFileSync(filePath, 'utf8');
+    const users = JSON.parse(data);
+
+    // 2. Mencari user berdasarkan ID
+    const userFound = users.find(u => u.id === username);
+
+    if (userFound) {
+      // Mengembalikan response sukses dalam format JSON
+      return reply.code(200).send({
+        status: "success",
+        data: userFound
+      });
+    } else {
+      // Mengembalikan response 404 jika user tidak ada di users.json
+      return reply.code(404).send({
+        status: "error",
+        message: `User '${username}' tidak ditemukan`
+      });
+    }
+
+  } catch (err) {
+    console.error("Gagal membaca file:", err);
+    return reply.code(500).send({
+      status: "error",
+      message: "Terjadi kesalahan pada server saat membaca data"
+    });
+  }
 });
 
 /**
@@ -523,7 +561,7 @@ function initUsers() {
   try {
     const data = fs.readFileSync(masterFilePath, 'utf8');
     const masterUsers = JSON.parse(data); // Asumsi isinya array of objects: [{id: "usera"}, {id: "userb"}]
-
+    users.push(...masterUsers)
     // Ambil daftar ID user dari master file untuk perbandingan
     const masterUserIds = masterUsers.map(u => `${u.id}.json`);
     console.log({ masterUserIds })
