@@ -599,7 +599,7 @@ function initUsers() {
     const masterUsers = JSON.parse(data); // Asumsi isinya array of objects: [{id: "usera"}, {id: "userb"}]
     users.push(...masterUsers)
     // Ambil daftar ID user dari master file untuk perbandingan
-    const masterUserIds = masterUsers.map(u => `${u.id}.json`);
+    const masterUserIds = masterUsers.map(u => `${u}.json`);
     console.log({ masterUserIds })
     // 3. JIKA file di /tmp tidak ada di data users.json maka akan di DELETE
     allUserListFiles.forEach(file => {
