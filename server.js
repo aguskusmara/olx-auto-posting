@@ -85,14 +85,14 @@ fastify.get("/", function (request, reply) {
 
 
 fastify.get("/:user", function (request, reply) {
-  const username = request.params.user; 
+  const username = request.params.user;
   const filePath = path.join(process.cwd(), 'users.json');
 
   try {
     // 1. Membaca file users.json dari root directory
     const data = fs.readFileSync(filePath, 'utf8');
     const users = JSON.parse(data);
-
+    console.log({ users })
     // 2. Mencari user berdasarkan ID
     const userFound = users.find(u => u.id === username);
 
