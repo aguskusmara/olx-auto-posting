@@ -6,6 +6,7 @@ const path = require("path");
 
 class Olx {
   constructor(email, password, headers) {
+    console.log(email);
     if (headers) {
       this.headers = headers;
     } else {
