@@ -94,7 +94,7 @@ fastify.get("/:user", function (request, reply) {
     const users = JSON.parse(data);
     console.log({ users })
     // 2. Mencari user berdasarkan ID
-    const userFound = users.find(u => u.id === username);
+    const userFound = users.find(u => u === username);
 
     if (userFound) {
       // Mengembalikan response sukses dalam format JSON
