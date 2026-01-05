@@ -5,6 +5,7 @@
 const axios = require("axios");
 
 const path = require("path");
+const fs = require("fs");
 const {
   Olx, // Tidak digunakan langsung di sini, tapi diimpor dari clients.js
   clients, // Tidak digunakan langsung di sini, tapi diimpor dari clients.js
@@ -490,6 +491,59 @@ fastify.post("/sundul", async function (request, reply) {
     });
   }
 });
+
+const userStorePath = path.join("/tmp", "users");
+
+function ensureUserStoreDir(userStorePath) {
+  if (!fs.existsSync(userStorePath)) {
+    try {
+      fs.mkdirSync(userStorePath, { recursive: true });
+    } catch (e) {
+      console.error("Failed to create user store directory in /tmp:", e);
+    }
+  }
+}
+
+function initUsers() {
+  ensureUserStoreDir(userStorePath);
+
+  // 1. MENGAMBIL SEMUA LIST FILE yang ada di folder /tmp/users
+  // fs.readdirSync akan mengembalikan array nama file, misal: ['usera.json', 'userb.json']
+  let allUserListFiles = [];
+  try {
+    allUserListFiles = fs.readdirSync(userStorePath);
+  } catch (err) {
+    console.error("Gagal membaca direktori /tmp:", err);
+  }
+
+  console.log({ allUserListFiles })
+
+  // 2. Membaca data master dari GitHub (users.json di root)
+  const masterFilePath = path.join(process.cwd(), 'users.json');
+  try {
+    const data = fs.readFileSync(masterFilePath, 'utf8');
+    const masterUsers = JSON.parse(data); // Asumsi isinya array of objects: [{id: "usera"}, {id: "userb"}]
+
+    // Ambil daftar ID user dari master file untuk perbandingan
+    const masterUserIds = masterUsers.map(u => `${u.id}.json`);
+    console.log({ masterUserIds })
+    // 3. JIKA file di /tmp tidak ada di data users.json maka akan di DELETE
+    allUserListFiles.forEach(file => {
+      if (!masterUserIds.includes(file)) {
+        const fileToDelete = path.join(userStorePath, file);
+        fs.unlinkSync(fileToDelete);
+        console.log(`Deleted obsolete file: ${file}`);
+      }
+    });
+
+    console.log("Sinkronisasi /tmp selesai.");
+  } catch (err) {
+    console.error("Gagal sinkronisasi data:", err);
+  }
+}
+
+initUsers();
+
 
 // Jalankan server
 const start = async () => {
