@@ -609,48 +609,55 @@ class Olx {
     }
   }
 
-  async uploadPicture(dataFile) {
-    let file;
-    try {
-      file = await this.getFileByUrl(dataFile);
-      if (!file) {
-        console.warn("No file content received for upload:", dataFile.fileName);
-        return; // Mengembalikan undefined jika file tidak didapatkan
-      }
-      const url = "https://dealer.olx.co.id/dealer-api/sell/image";
-      const form = new FormData();
-      
-      const buffer = Buffer.from(file);
-      // const isActuallyJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
-      // const finalMime = isActuallyJpeg ? 'image/jpeg' : 'image/png';
-      
-      // form.append("file", buffer, {
-      //   filename: 'blob',
-      //   contentType: finalMime
-      // });
-      
-      form.append("file", buffer, dataFile.fileName);
-
-      const { "content-type": _, ...otherHeaders } = this.headers;
-      
-      const { data } = await axios(url, {
-        headers: {
-          ...form.getHeaders(),
-          Authorization: "Bearer " + this.user.access_token,
-          // ...this.headers,
-          ...otherHeaders, // Memasukkan api-version, client-language, dll
-        },
-        data: form,
-        method: "POST"
-      });
-      dataFile.id = data.data.id;
-      return dataFile;
-    } catch (err) {
-      console.error("Error uploading picture:", err.message); // Log error
-      console.log(dataFile);
-      throw err; // Lempar kembali error agar bisa ditangkap oleh pemanggil
+async uploadPicture(dataFile) {
+  let file;
+  try {
+    file = await this.getFileByUrl(dataFile);
+    if (!file) {
+      console.warn("No file content received for upload:", dataFile.fileName);
+      return;
     }
+
+    const url = "https://dealer.olx.co.id/dealer-api/sell/image";
+    const form = new FormData();
+    const buffer = Buffer.from(file); //
+
+    // DETEKSI BINARI OTOMATIS (Magic Numbers)
+    // JPEG: 0xFF 0xD8 | PNG: 0x89 0x50
+    let actualMime = 'image/jpeg';
+    if (buffer[0] === 0x89 && buffer[1] === 0x50) {
+      actualMime = 'image/png';
+    }
+
+    // WAJIB: Masukkan contentType ke dalam append agar sinkron dengan biner
+    form.append("file", buffer, {
+      filename: 'blob', // Menggunakan nama file asli (8.jpg)
+      contentType: actualMime // Memastikan OLX menerima 'image/jpeg' untuk file .jpg
+    });
+
+    const { "content-type": _, ...otherHeaders } = this.headers; //
+    
+    const { data } = await axios(url, {
+      headers: {
+        ...form.getHeaders(), // Mengatur Boundary Multipart yang benar
+        Authorization: "Bearer " + this.user.access_token,
+        ...otherHeaders,
+      },
+      data: form,
+      method: "POST"
+    });
+
+    dataFile.id = data.data.id;
+    return dataFile;
+  } catch (err) {
+    if (err.response) {
+      // Mencetak alasan spesifik dari server OLX
+      console.error("OLX Reject Reason:", JSON.stringify(err.response.data));
+    }
+    console.error("Error uploading picture:", err.message);
+    throw err;
   }
+}
 
   async getLocation(address) {
     try {
