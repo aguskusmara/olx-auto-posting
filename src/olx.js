@@ -597,7 +597,8 @@ class Olx {
       const res = await axios.get(fileUrl, {
         headers: {
           Authorization: "Bearer " + fileToken,
-          Accept: mime,
+          // Accept: mime,
+          Accept: "*/*", // Gunakan ini agar file asli terambil apa adanya
         },
         responseType: "arraybuffer",
       });
@@ -620,15 +621,15 @@ class Olx {
       const form = new FormData();
       
       const buffer = Buffer.from(file);
-      const isActuallyJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
-      const finalMime = isActuallyJpeg ? 'image/jpeg' : 'image/png';
+      // const isActuallyJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
+      // const finalMime = isActuallyJpeg ? 'image/jpeg' : 'image/png';
       
-      form.append("file", buffer, {
-        filename: 'blob',
-        contentType: finalMime
-      });
+      // form.append("file", buffer, {
+      //   filename: 'blob',
+      //   contentType: finalMime
+      // });
       
-      // form.append("file", fileBuffer, dataFile.fileName);
+      form.append("file", buffer, dataFile.fileName);
 
       const { "content-type": _, ...otherHeaders } = this.headers;
       
