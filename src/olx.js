@@ -623,7 +623,7 @@ class Olx {
       const isActuallyJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
       const finalMime = isActuallyJpeg ? 'image/jpeg' : 'image/png';
       
-      form.append("file", fileBuffer, {
+      form.append("file", buffer, {
         filename: 'blob',
         contentType: finalMime
       });
