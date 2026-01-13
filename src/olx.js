@@ -619,16 +619,19 @@ class Olx {
       const url = "https://dealer.olx.co.id/dealer-api/sell/image";
       const form = new FormData();
       
-      const fileBuffer = Buffer.from(file);
-
+      const buffer = Buffer.from(file);
+      const isActuallyJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
+      const finalMime = isActuallyJpeg ? 'image/jpeg' : 'image/png';
+      
       form.append("file", fileBuffer, {
         filename: 'blob',
-        contentType: dataFile.mime || 'image/png'
+        contentType: finalMime
       });
+      
+      // form.append("file", fileBuffer, dataFile.fileName);
 
       const { "content-type": _, ...otherHeaders } = this.headers;
       
-      // form.append("file", file, dataFile.fileName);
       const { data } = await axios(url, {
         headers: {
           ...form.getHeaders(),
