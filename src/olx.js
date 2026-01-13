@@ -11,8 +11,9 @@ class Olx {
       this.headers = headers;
     } else {
       this.headers = {
-        "api-version": "133",
+        "api-version": "135",
         "client-language": "en-id",
+        "config-version": "600ef8adcf23de5961e8816a92150b7f"
       };
     }
     this.email = email;
@@ -631,6 +632,7 @@ class Olx {
       return dataFile;
     } catch (err) {
       console.error("Error uploading picture:", err.message); // Log error
+      console.log(file);
       throw err; // Lempar kembali error agar bisa ditangkap oleh pemanggil
     }
   }
