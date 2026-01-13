@@ -1,3 +1,4 @@
+const sharp = require('sharp'); // Tambahkan di bagian atas file
 const adsParameter = require("./adsParams.json"); // Asumsikan file ini ada
 const axios = require("axios");
 const fs = require("fs");
@@ -11,8 +12,9 @@ class Olx {
       this.headers = headers;
     } else {
       this.headers = {
-        "api-version": "133",
+        "api-version": "135",
         "client-language": "en-id",
+        "config-version": "600ef8adcf23de5961e8816a92150b7f"
       };
     }
     this.email = email;
@@ -596,7 +598,8 @@ class Olx {
       const res = await axios.get(fileUrl, {
         headers: {
           Authorization: "Bearer " + fileToken,
-          Accept: mime,
+          // Accept: mime,
+          Accept: "*/*", // Gunakan ini agar file asli terambil apa adanya
         },
         responseType: "arraybuffer",
       });
@@ -607,33 +610,58 @@ class Olx {
     }
   }
 
-  async uploadPicture(dataFile) {
-    let file;
-    try {
-      file = await this.getFileByUrl(dataFile);
-      if (!file) {
-        console.warn("No file content received for upload:", dataFile.fileName);
-        return; // Mengembalikan undefined jika file tidak didapatkan
+async uploadPicture(dataFile) {
+  try {
+    // 1. Ambil file dari Google Drive
+    const fileContent = await this.getFileByUrl(dataFile);
+    if (!fileContent) return;
+
+    // 2. Proses Konversi ke JPEG Murni dengan Sharp
+    const processedBuffer = await sharp(Buffer.from(fileContent))
+      .jpeg({ 
+        quality: 85,           // Kualitas optimal (tidak terlalu berat)
+        chromaSubsampling: '4:4:4' // Mempertahankan ketajaman warna
+      })
+      .resize(1280, 1280, {    // Resolusi standar dealer OLX
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .toBuffer();
+
+    const url = "https://dealer.olx.co.id/dealer-api/sell/image";
+    const form = new FormData();
+
+    // 3. Masukkan ke FormData sesuai request browser asli
+    // Menggunakan filename "blob" dan Content-Type image/jpeg
+    form.append("file", processedBuffer, {
+      filename: "blob",        // <--- Sesuai permintaan Anda
+      contentType: "image/jpeg" 
+    });
+
+    // 4. Bersihkan headers agar boundary multipart tidak tertimpa
+    const { "content-type": _, ...otherHeaders } = this.headers;
+
+    const { data } = await axios.post(url, form, {
+      headers: {
+        ...form.getHeaders(),
+        'Authorization': "Bearer " + this.user.access_token,
+        ...otherHeaders,
       }
-      const url = "https://dealer.olx.co.id/dealer-api/sell/image";
-      const form = new FormData();
-      form.append("file", file, dataFile.fileName);
-      const { data } = await axios(url, {
-        headers: {
-          ...form.getHeaders(),
-          Authorization: "Bearer " + this.user.access_token,
-          ...this.headers,
-        },
-        data: form,
-        method: "POST",
-      });
-      dataFile.id = data.data.id;
-      return dataFile;
-    } catch (err) {
-      console.error("Error uploading picture:", err.message); // Log error
-      throw err; // Lempar kembali error agar bisa ditangkap oleh pemanggil
+    });
+
+    dataFile.id = data.data.id;
+    return dataFile;
+
+  } catch (err) {
+    if (err.response) {
+      // Log detail jika OLX masih menolak
+      console.error("OLX Reject Detail:", JSON.stringify(err.response.data));
+    } else {
+      console.error("Upload Error:", err.message);
     }
+    throw err;
   }
+}
 
   async getLocation(address) {
     try {
