@@ -622,7 +622,7 @@ class Olx {
       const fileBuffer = Buffer.from(file);
 
       form.append("file", fileBuffer, {
-        filename: dataFile.fileName || 'image.png',
+        filename: 'blob',
         contentType: dataFile.mime || 'image/png'
       });
 
@@ -637,15 +637,13 @@ class Olx {
           ...otherHeaders, // Memasukkan api-version, client-language, dll
         },
         data: form,
-        method: "POST",
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        method: "POST"
       });
       dataFile.id = data.data.id;
       return dataFile;
     } catch (err) {
       console.error("Error uploading picture:", err.message); // Log error
-      console.log(file);
+      console.log(dataFile);
       throw err; // Lempar kembali error agar bisa ditangkap oleh pemanggil
     }
   }
