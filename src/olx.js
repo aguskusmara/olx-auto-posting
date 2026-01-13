@@ -618,15 +618,28 @@ class Olx {
       }
       const url = "https://dealer.olx.co.id/dealer-api/sell/image";
       const form = new FormData();
-      form.append("file", file, dataFile.fileName);
+      
+      const fileBuffer = Buffer.from(file);
+
+      form.append("file", fileBuffer, {
+        filename: dataFile.fileName || 'image.png',
+        contentType: dataFile.mime || 'image/png'
+      });
+
+      const { "content-type": _, ...otherHeaders } = this.headers;
+      
+      // form.append("file", file, dataFile.fileName);
       const { data } = await axios(url, {
         headers: {
           ...form.getHeaders(),
           Authorization: "Bearer " + this.user.access_token,
-          ...this.headers,
+          // ...this.headers,
+          ...otherHeaders, // Memasukkan api-version, client-language, dll
         },
         data: form,
         method: "POST",
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       });
       dataFile.id = data.data.id;
       return dataFile;
