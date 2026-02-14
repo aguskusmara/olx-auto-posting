@@ -97,6 +97,21 @@ async function deleteAdById({ user, id, olx_id }) {
   return adId;
 }
 
+async function archiveAdByIds({ user, ids }) {
+  let client = clients.get(user.email);
+  if (!client) {
+    client = new Olx(user.email, user.password, user.headers);
+    await client.auth();
+  }
+  const results = [];
+  for (let { id, row, olx_id } of ids) {
+    const adId = await client.archiveAdById(id);
+    results.push({ ...adId, id, row });
+  }
+  return results;
+}
+
+
 async function deleteAdByIds({ user, ids }) {
   let client = clients.get(user.email);
   if (!client) {
@@ -182,4 +197,5 @@ module.exports = {
   sundulAd,
   deleteAdById,
   deleteAdByIds,
+  archiveAdByIds
 };
