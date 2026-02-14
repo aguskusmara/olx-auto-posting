@@ -291,7 +291,25 @@ class Olx {
       throw err; // Lempar error untuk ditangani di tingkat yang lebih tinggi
     }
   }
-
+  
+  async archiveAdById(id) {
+    const url =
+      "https://dealer.olx.co.id/dealer-api/sell/" + id + "/archive";
+    try {
+      const { data } = await axios(url, {
+        headers: {
+          Authorization: "Bearer " + this.user.access_token,
+          ...this.headers,
+        },
+        method: "PUT",
+      });
+      return data;
+    } catch (err) {
+      console.error("Error deleting ad by ID:", err.message, "status:", err.response?.status);
+      throw err;
+    }
+  }
+  
   async deleteAdById(id) {
     const url =
       "https://dealer.olx.co.id/dealer-api/sell/" + id + "/delete?code=close";
