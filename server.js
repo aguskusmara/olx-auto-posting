@@ -17,6 +17,7 @@ const {
   sundulAd,
   deleteAdById,
   deleteAdByIds,
+  archiveAdByIds
 } = require("./src/clients.js"); // Asumsi lokasi file clients.js
 
 // Require the fastify framework and instantiate it
@@ -450,6 +451,79 @@ fastify.post("/bulk-delete", async function (request, reply) {
   };
   try {
     const adStatus = await deleteAdByIds({ user, ids }); // Asumsi deleteAdByIds menerima array ids
+    dt.data = {
+      success: true,
+      data: adStatus,
+    };
+    await postToGs(dt);
+    return reply.send({
+      success: true,
+      data: adStatus,
+    });
+  } catch (err) {
+    fastify.log.error("Error in /bulk-delete route:", err);
+
+    let clientErrorMessage = "An unexpected error occurred during bulk delete.";
+    let gsErrorMessage = "An unexpected error occurred during bulk delete.";
+
+    if (err.response) {
+      const apiErrorData = err.response.data;
+      if (apiErrorData && apiErrorData.fieldErrors && apiErrorData.fieldErrors.length > 0) {
+        clientErrorMessage = apiErrorData.fieldErrors
+          .map((e) => (e.field ? `${e.field}: ` : '') + e.message)
+          .join("\n");
+      } else if (apiErrorData && apiErrorData.message) {
+        clientErrorMessage = apiErrorData.message;
+      } else if (err.response.statusText) {
+        clientErrorMessage = err.response.statusText;
+      }
+      gsErrorMessage = `API Error (${err.response.status || 'Unknown'}): ${clientErrorMessage}`;
+
+    } else if (err.request) {
+      clientErrorMessage = "Network error or no response from external API during bulk delete.";
+      gsErrorMessage = clientErrorMessage;
+    } else {
+      clientErrorMessage = err.message || "An error occurred during bulk delete processing.";
+      gsErrorMessage = clientErrorMessage;
+    }
+
+    dt.data = {
+      success: false,
+      message: gsErrorMessage,
+    };
+    await postToGs(dt);
+    reply.status(500).send({
+      success: false,
+      message: clientErrorMessage,
+    });
+  }
+});
+
+// Route untuk menghapus iklan secara massal
+fastify.post("/bulk-archive", async function (request, reply) {
+  const { user, ids, requestId, server, access_token, func } =
+    request.body; // olx_id tidak relevan di sini jika ids adalah array
+
+  const email = user.email;
+  const isValid = guardUser(email);
+
+  // 2. Jika guardUser mengembalikan null/false (User tidak ada di GitHub)
+  if (!isValid) {
+    return reply.status(404).send({
+      success: false,
+      message: "User tidak terdaftar atau telah dihapus dari sistem."
+    });
+  }
+
+  const dt = {
+    requestId,
+    server,
+    access_token,
+    func,
+    deleted_ids: ids || [] // Tambahkan ID yang akan dihapus ke dt
+  };
+  try {
+    const adStatus = await archiveAdByIds({ user, ids }); // Asumsi deleteAdByIds menerima array ids
     dt.data = {
       success: true,
       data: adStatus,
